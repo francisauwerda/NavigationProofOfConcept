@@ -12,11 +12,14 @@ import {
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 
-type RootStackParamList = StaticParamList<typeof RootStackNavigator>;
+type UserStackParamList = StaticParamList<typeof UserStackNavigator>;
+type LoginStackParamList = StaticParamList<typeof LoginStackNavigator>;
+
+type CombinedStackParamList = UserStackParamList & LoginStackParamList;
 
 declare global {
   namespace ReactNavigation {
-    interface RootParamList extends RootStackParamList {}
+    interface RootParamList extends CombinedStackParamList {}
   }
 }
 
@@ -91,9 +94,7 @@ function LandingPageScreen() {
       <Text>Landing Page</Text>
       <Button
         title="Go to Login"
-        onPress={() =>
-          navigation.navigate('Login', {email: 'martin.wiingaard@pleoi.io'})
-        }
+        onPress={() => navigation.navigate('ExpenseDetails')}
       />
     </View>
   );
@@ -105,8 +106,6 @@ type LoginProps = StaticScreenProps<{
 
 function LoginScreen(props: LoginProps) {
   const {signIn} = useSession();
-  const navigation = useNavigation();
-  props.route.params.email;
 
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
@@ -151,29 +150,23 @@ const useCurrentRoot = (): Root => {
   return currentRoot;
 };
 
-const isUserRootEnabled = () => {
-  return useCurrentRoot() === 'user';
+type UserContextType = {
+  user: string;
+  setUser: (user: string) => void;
 };
 
-const isLoginRootEnabled = () => {
-  return useCurrentRoot() === 'login';
+const UserContext = React.createContext<UserContextType | undefined>(undefined);
+
+const useUser = () => {
+  const context = useContext(UserContext);
+  if (!context) {
+    throw new Error('UserContext must be used within a UserProvider');
+  }
+  return context;
 };
-
-const isSplashRootEnabled = () => {
-  return useCurrentRoot() === 'splash';
-};
-
-const UserContext = React.createContext({
-  user: '',
-  setUser: (user: string) => {
-    console.log(user);
-  },
-});
-
-const useUser = () => useContext(UserContext);
 
 const UserProvider = ({children}: {children: React.ReactNode}) => {
-  const [user, setUser] = React.useState<string>('');
+  const [user, setUser] = React.useState<string>('francis');
 
   return (
     <UserContext.Provider value={{user, setUser}}>
@@ -207,72 +200,50 @@ const SessionProvider = ({children}: {children: React.ReactNode}) => {
   );
 };
 
-const RootStackNavigator = createNativeStackNavigator({
-  groups: {
-    User: {
-      if: isUserRootEnabled,
-      screens: {
-        TabBar: {
-          screen: TabNavigator,
-          options: {
-            animation: 'none',
-          },
-        },
-        ExpenseDetails: ExpenseDetailsScreen,
-        Profile: ProfileScreen,
-      },
-    },
-    Login: {
-      if: isLoginRootEnabled,
-      screens: {
-        LandingPage: {
-          screen: LandingPageScreen,
-          options: {
-            animation: 'none',
-          },
-        },
-        Login: LoginScreen,
-        Passcode: PasscodeScreen,
-      },
-    },
-  },
+const UserStackNavigator = createNativeStackNavigator({
   screens: {
-    Splash: {
-      if: isSplashRootEnabled,
-      screen: SplashScreen,
-    },
-    // Offline: {
-    //   if: useOfflineScreenEnabled,
-    //   screen: OfflineScreen,
-    // },
-    // ...
+    TabBar: TabNavigator,
+    ExpenseDetails: ExpenseDetailsScreen,
+    Profile: ProfileScreen,
   },
 });
 
-const Navigation = createStaticNavigation(RootStackNavigator);
-// const UserNavigation = createStaticNavigation(RootStackNavigator);
-// const LoginNavigation = createStaticNavigation(RootStackNavigator);
+const LoginStackNavigator = createNativeStackNavigator({
+  screens: {
+    LandingPage: LandingPageScreen,
+    Login: LoginScreen,
+    Passcode: PasscodeScreen,
+  },
+});
 
-// const NavigationProvider = () => {
-//   const isSignedIn = true;
-//   useSession();
-//   if (isSignedIn) {
-//     return (
-//       <UserProvider>
-//         <UserNavigation />
-//       </UserProvider>
-//     );
-//   }
+const UserNavigation = createStaticNavigation(UserStackNavigator);
+const LoginNavigation = createStaticNavigation(LoginStackNavigator);
 
-//   return <LoginNavigation />;
-// };
+const NavigationProvider = () => {
+  const root = useCurrentRoot();
+
+  useEffect(() => {
+    console.log({root});
+  }, [root]);
+
+  switch (root) {
+    case 'user':
+      return (
+        <UserProvider>
+          <UserNavigation />
+        </UserProvider>
+      );
+    case 'login':
+      return <LoginNavigation />;
+    case 'splash':
+      return <SplashScreen />;
+  }
+};
 
 function App(): React.JSX.Element {
   return (
     <SessionProvider>
-      <UserProvider>
-        <Navigation />
-      </UserProvider>
+      <NavigationProvider />
     </SessionProvider>
   );
 }
