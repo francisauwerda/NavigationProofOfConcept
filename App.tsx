@@ -5,13 +5,14 @@ import {Text, View, Button} from 'react-native';
 
 import {
   createStaticNavigation,
+  StaticScreenProps,
   useNavigation,
   type StaticParamList,
 } from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 
-type RootStackParamList = StaticParamList<typeof SessionStack>;
+type RootStackParamList = StaticParamList<typeof RootStackNavigator>;
 
 declare global {
   namespace ReactNavigation {
@@ -19,14 +20,7 @@ declare global {
   }
 }
 
-const SessionContext = React.createContext({
-  isSignedIn: false,
-  signIn: () => {},
-  signOut: () => {},
-});
-
-const useSession = () => React.useContext(SessionContext);
-
+// Screens
 function SplashScreen() {
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
@@ -35,27 +29,18 @@ function SplashScreen() {
   );
 }
 
-function DeprecationWallScreen() {
-  return (
-    <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
-      <Text>Deprecation Wall</Text>
-    </View>
-  );
-}
-
-function OfflineScreen() {
-  return (
-    <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
-      <Text>Offline Screen</Text>
-    </View>
-  );
-}
-
 function HomeScreen() {
   const navigation = useNavigation();
+  const {user, setUser} = useUser();
+
+  useEffect(() => {
+    setUser('DJ John');
+  }, []);
+
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
       <Text>Home Screen</Text>
+      <Text>{user}</Text>
       <Button
         title="Go to Expense Details"
         onPress={() => navigation.navigate('ExpenseDetails')}
@@ -80,18 +65,12 @@ function AccountScreen() {
   );
 }
 
-const MainStackTabs = createBottomTabNavigator({
-  screens: {
-    Home: HomeScreen,
-    Cards: CardsScreen,
-    Account: AccountScreen,
-  },
-});
-
 function ExpenseDetailsScreen() {
+  const {user} = useUser();
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
       <Text>Expense Details</Text>
+      <Text>{user}</Text>
     </View>
   );
 }
@@ -104,48 +83,30 @@ function ProfileScreen() {
   );
 }
 
-// UserNavigator from Excalidraw
-const MainStack = createNativeStackNavigator({
-  screens: {
-    MainStackTabs: MainStackTabs,
-    ExpenseDetails: ExpenseDetailsScreen,
-    Profile: ProfileScreen,
-  },
-});
-
 function LandingPageScreen() {
   const navigation = useNavigation();
-
-  React.useEffect(
-    () =>
-      navigation.addListener('focus', () =>
-        console.log('LandingPageScreen was focused'),
-      ),
-    [navigation],
-  );
 
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
       <Text>Landing Page</Text>
       <Button
-        title="Go to LoginPage"
-        onPress={() => navigation.navigate('Login')}
+        title="Go to Login"
+        onPress={() =>
+          navigation.navigate('Login', {email: 'martin.wiingaard@pleoi.io'})
+        }
       />
     </View>
   );
 }
 
-function LoginScreen() {
+type LoginProps = StaticScreenProps<{
+  email: string;
+}>;
+
+function LoginScreen(props: LoginProps) {
   const {signIn} = useSession();
   const navigation = useNavigation();
-
-  React.useEffect(
-    () =>
-      navigation.addListener('focus', () =>
-        console.log('LoginScreen was focused'),
-      ),
-    [navigation],
-  );
+  props.route.params.email;
 
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
@@ -163,87 +124,73 @@ function PasscodeScreen() {
   );
 }
 
-// LoginNavigator from Excalidraw
-const AuthStack = createNativeStackNavigator({
+const TabNavigator = createBottomTabNavigator({
   screens: {
-    LandingPage: LandingPageScreen,
-    Login: LoginScreen,
-    Passcode: PasscodeScreen,
+    Home: HomeScreen,
+    Cards: CardsScreen,
+    Account: AccountScreen,
   },
 });
 
-const useCurrentSessionStackScreen = () => {
-  const {isSignedIn} = useContext(SessionContext);
+type Root = 'user' | 'login' | 'splash';
+
+const useCurrentRoot = (): Root => {
+  const {isSignedIn} = useSession();
   const [loading, setLoading] = useState(true);
-  const [currentStack, setCurrentStack] = useState('Splash');
+  const [currentRoot, setCurrentRoot] = useState<Root>('splash');
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setCurrentStack(isSignedIn ? 'MainStack' : 'AuthStack');
+      setCurrentRoot(isSignedIn ? 'user' : 'login');
       setLoading(false);
     }, 1000);
 
     return () => clearTimeout(timer);
   }, [isSignedIn]);
 
-  return loading ? 'Splash' : currentStack;
+  return currentRoot;
 };
 
-const useSplashScreenEnabled = () => {
-  const splashScreenEnabled = useCurrentSessionStackScreen() === 'Splash';
-  console.log('splashScreenEnabled', splashScreenEnabled);
-  return useCurrentSessionStackScreen() === 'Splash';
+const isUserRootEnabled = () => {
+  return useCurrentRoot() === 'user';
 };
 
-// const useDeprecationWallScreenEnabled = () => {
-//   return useCurrentSessionStackScreen() === 'DeprecationWall';
-// };
-
-// const useOfflineScreenEnabled = () => {
-//   return useCurrentSessionStackScreen() === 'Offline';
-// };
-
-const useMainStackEnabled = () => {
-  const mainStackEnabled = useCurrentSessionStackScreen() === 'MainStack';
-  console.log('mainStackEnabled', mainStackEnabled);
-  return useCurrentSessionStackScreen() === 'MainStack';
+const isLoginRootEnabled = () => {
+  return useCurrentRoot() === 'login';
 };
 
-const useAuthStackEnabled = () => {
-  const authStackEnabled = useCurrentSessionStackScreen() === 'AuthStack';
-  console.log('authStackEnabled', authStackEnabled);
-  return useCurrentSessionStackScreen() === 'AuthStack';
+const isSplashRootEnabled = () => {
+  return useCurrentRoot() === 'splash';
 };
 
-// SessionNavigator from Excalidraw
-const SessionStack = createNativeStackNavigator({
-  screens: {
-    Splash: {
-      if: useSplashScreenEnabled,
-      screen: SplashScreen,
-    },
-    // DeprecationWall: {
-    //   if: useDeprecationWallScreenEnabled,
-    //   screen: DeprecationWallScreen,
-    // },
-    // Offline: {
-    //   if: useOfflineScreenEnabled,
-    //   screen: OfflineScreen,
-    // },
-    MainStack: {
-      if: useMainStackEnabled,
-      screen: MainStack,
-    },
-    AuthStack: {
-      if: useAuthStackEnabled,
-      screen: AuthStack,
-    },
+const UserContext = React.createContext({
+  user: '',
+  setUser: (user: string) => {
+    console.log(user);
   },
 });
 
-const Navigation = createStaticNavigation(SessionStack);
+const useUser = () => useContext(UserContext);
 
-function App(): React.JSX.Element {
+const UserProvider = ({children}: {children: React.ReactNode}) => {
+  const [user, setUser] = React.useState<string>('');
+
+  return (
+    <UserContext.Provider value={{user, setUser}}>
+      {children}
+    </UserContext.Provider>
+  );
+};
+
+const SessionContext = React.createContext({
+  isSignedIn: false,
+  signIn: () => {},
+  signOut: () => {},
+});
+
+const useSession = () => React.useContext(SessionContext);
+
+const SessionProvider = ({children}: {children: React.ReactNode}) => {
   const [isSignedIn, setIsSignedIn] = React.useState(false);
   const signIn = () => setIsSignedIn(true);
   const signOut = () => setIsSignedIn(false);
@@ -255,8 +202,78 @@ function App(): React.JSX.Element {
         signIn,
         signOut,
       }}>
-      <Navigation />
+      {children}
     </SessionContext.Provider>
+  );
+};
+
+const RootStackNavigator = createNativeStackNavigator({
+  groups: {
+    User: {
+      if: isUserRootEnabled,
+      screens: {
+        TabBar: {
+          screen: TabNavigator,
+          options: {
+            animation: 'none',
+          },
+        },
+        ExpenseDetails: ExpenseDetailsScreen,
+        Profile: ProfileScreen,
+      },
+    },
+    Login: {
+      if: isLoginRootEnabled,
+      screens: {
+        LandingPage: {
+          screen: LandingPageScreen,
+          options: {
+            animation: 'none',
+          },
+        },
+        Login: LoginScreen,
+        Passcode: PasscodeScreen,
+      },
+    },
+  },
+  screens: {
+    Splash: {
+      if: isSplashRootEnabled,
+      screen: SplashScreen,
+    },
+    // Offline: {
+    //   if: useOfflineScreenEnabled,
+    //   screen: OfflineScreen,
+    // },
+    // ...
+  },
+});
+
+const Navigation = createStaticNavigation(RootStackNavigator);
+// const UserNavigation = createStaticNavigation(RootStackNavigator);
+// const LoginNavigation = createStaticNavigation(RootStackNavigator);
+
+// const NavigationProvider = () => {
+//   const isSignedIn = true;
+//   useSession();
+//   if (isSignedIn) {
+//     return (
+//       <UserProvider>
+//         <UserNavigation />
+//       </UserProvider>
+//     );
+//   }
+
+//   return <LoginNavigation />;
+// };
+
+function App(): React.JSX.Element {
+  return (
+    <SessionProvider>
+      <UserProvider>
+        <Navigation />
+      </UserProvider>
+    </SessionProvider>
   );
 }
 
