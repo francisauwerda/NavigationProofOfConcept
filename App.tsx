@@ -21,10 +21,18 @@ declare global {
   }
 }
 
+// StackOverflow
+//
+// https://stackoverflow.com/questions/79211748/wrap-nested-navigator-in-context-with-static-api
+
 // Screens
 
 function HomeScreen() {
   const navigation = useNavigation();
+
+  // This does, and should!, crash the app, because the ProfileProvider is not wrapped around the HomeScreen
+  // but only around the profile screens.
+  // const {name} = useProfile();
 
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
@@ -39,6 +47,7 @@ function HomeScreen() {
 
 function ProfileScreen() {
   const navigation = useNavigation();
+  const {name, setName} = useProfile();
 
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
@@ -49,16 +58,20 @@ function ProfileScreen() {
           navigation.navigate('ProfileStack', {screen: 'MoreProfile'})
         }
       />
+      <Button title="Set name to Francis" onPress={() => setName('Francis')} />
+      <Text>{name}</Text>
     </View>
   );
 }
 
-https://stackoverflow.com/questions/79211748/wrap-nested-navigator-in-context-with-static-api
-
 function MoreProfileScreen() {
+  const {name, setName} = useProfile();
+
   return (
     <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
       <Text>More Profile</Text>
+      <Button title="Set name to Martin" onPress={() => setName('Martin')} />
+      <Text>{name}</Text>
     </View>
   );
 }
@@ -84,6 +97,14 @@ const ProfileProvider = ({children}: {children: React.ReactNode}) => {
   );
 };
 
+const useProfile = () => {
+  const context = useContext(ProfileContext);
+  if (!context) {
+    throw new Error('useProfile must be used within the ProfileProvider');
+  }
+  return context;
+};
+
 // Navigators
 
 const ProfileStackNavigator = createNativeStackNavigator({
@@ -91,6 +112,7 @@ const ProfileStackNavigator = createNativeStackNavigator({
     Profile: ProfileScreen,
     MoreProfile: MoreProfileScreen,
   },
+  layout: ({children}) => <ProfileProvider>{children}</ProfileProvider>,
 });
 
 const RootStackNavigator = createNativeStackNavigator({
@@ -115,11 +137,3 @@ function App(): React.JSX.Element {
 }
 
 export default App;
-
-const useProfile = () => {
-  const context = useContext(ProfileContext);
-  if (!context) {
-    throw new Error('useProfile must be used within the ProfileProvider');
-  }
-  return context;
-};
